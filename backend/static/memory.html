@@ -1,0 +1,1514 @@
+<!DOCTYPE html>
+<!--
+==============================================================================
+memory.html - メモリ管理ページ
+==============================================================================
+
+【このファイルの役割】
+記憶システムに保存されている情報を確認・管理するためのページです。
+- プロフィール（ユーザー情報）の一覧表示・追加・更新・削除
+- 目標の一覧表示・追加・更新・削除
+- 会話履歴の一覧表示・削除
+
+【HTMLの基本構造】
+<!DOCTYPE html>  - HTML5文書であることを宣言
+<html>           - HTML文書のルート要素
+<head>           - メタ情報（タイトル、CSS、設定など）
+<body>           - 実際に表示されるコンテンツ
+
+【学習ポイント】
+1. CSS: スタイル定義（見た目を整える）
+2. JavaScript: 動的な動作を実現
+3. Fetch API: サーバーとの通信
+4. DOM操作: HTML要素の追加・削除・変更
+==============================================================================
+-->
+<html lang="ja">
+<head>
+    <!-- 文字エンコーディングをUTF-8に設定（日本語を正しく表示するため） -->
+    <meta charset="UTF-8">
+
+    <!-- レスポンシブデザイン用の設定（モバイル対応） -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- ブラウザのタブに表示されるタイトル -->
+    <title>Memory Assistant - メモリ管理</title>
+
+    <!--
+    ========================================
+    CSSスタイル定義
+    ========================================
+
+    【CSSの基本】
+    セレクタ { プロパティ: 値; }
+
+    例:
+    .button { background: blue; }
+    → class="button" の要素の背景を青にする
+    -->
+    <style>
+        /*
+        ====================
+        リセットCSS
+        ====================
+        ブラウザごとのデフォルトスタイルの違いをなくす
+        */
+        * {
+            margin: 0;           /* 外側の余白を0に */
+            padding: 0;          /* 内側の余白を0に */
+            box-sizing: border-box;  /* paddingとborderを幅に含める */
+        }
+
+        /*
+        ====================
+        全体のスタイル
+        ====================
+        */
+        body {
+            /* フォントの設定（左から優先順に試す） */
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+
+            /* グラデーション背景 */
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+
+            /* 最小の高さを画面いっぱいに */
+            min-height: 100vh;
+
+            /* 内側の余白 */
+            padding: 20px;
+        }
+
+        /*
+        ====================
+        コンテナ（メインエリア）
+        ====================
+        */
+        .container {
+            max-width: 1200px;      /* 最大幅を制限 */
+            margin: 0 auto;          /* 中央揃え */
+            background: white;       /* 背景色 */
+            border-radius: 20px;     /* 角を丸く */
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);  /* 影 */
+            overflow: hidden;        /* はみ出た部分を隠す */
+        }
+
+        /*
+        ====================
+        ヘッダー
+        ====================
+        */
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px 30px;
+            display: flex;                      /* フレックスボックス */
+            justify-content: space-between;     /* 左右に分散 */
+            align-items: center;                /* 垂直方向中央揃え */
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        /* ナビゲーションリンク */
+        .nav-link {
+            color: white;
+            text-decoration: none;      /* 下線を消す */
+            padding: 8px 16px;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.2);  /* 半透明の白 */
+            transition: background 0.2s;            /* 変化をなめらかに */
+        }
+
+        .nav-link:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        /*
+        ====================
+        統計カード
+        ====================
+        */
+        .stats-container {
+            display: grid;                              /* グリッドレイアウト */
+            grid-template-columns: repeat(4, 1fr);      /* 4列に分割 */
+            gap: 20px;                                  /* カード間の隙間 */
+            padding: 20px 30px;
+            background: #f8fafc;
+        }
+
+        /* レスポンシブ対応：画面が狭い場合は2列に */
+        @media (max-width: 768px) {
+            .stats-container {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .stat-value {
+            font-size: 32px;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .stat-label {
+            color: #64748b;
+            font-size: 14px;
+            margin-top: 5px;
+        }
+
+        /*
+        ====================
+        タブ（切り替え）
+        ====================
+        */
+        .tabs {
+            display: flex;
+            background: #f1f5f9;
+            padding: 10px 30px;
+            gap: 10px;
+        }
+
+        .tab {
+            padding: 12px 24px;
+            border: none;
+            background: transparent;
+            cursor: pointer;                    /* マウスカーソルを手の形に */
+            border-radius: 8px;
+            font-size: 15px;
+            color: #64748b;
+            transition: all 0.2s;
+        }
+
+        .tab:hover {
+            background: rgba(102, 126, 234, 0.1);
+        }
+
+        /* 選択中のタブ */
+        .tab.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        /*
+        ====================
+        コンテンツエリア
+        ====================
+        */
+        .content {
+            padding: 30px;
+        }
+
+        /* タブパネル（非表示/表示の切り替え） */
+        .tab-panel {
+            display: none;      /* デフォルトは非表示 */
+        }
+
+        .tab-panel.active {
+            display: block;     /* アクティブなパネルだけ表示 */
+        }
+
+        /*
+        ====================
+        セクションヘッダー
+        ====================
+        */
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .section-title {
+            font-size: 20px;
+            color: #1e293b;
+        }
+
+        /*
+        ====================
+        ボタンスタイル
+        ====================
+        */
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);        /* 上に浮かせる */
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+
+        .btn-secondary {
+            background: #e2e8f0;
+            color: #475569;
+        }
+
+        .btn-secondary:hover {
+            background: #cbd5e1;
+        }
+
+        .btn-small {
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+
+        /*
+        ====================
+        テーブル
+        ====================
+        */
+        .table-container {
+            overflow-x: auto;       /* 横スクロール可能に */
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;  /* セルの境界を重ねる */
+        }
+
+        th, td {
+            padding: 12px 16px;
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        th {
+            background: #f8fafc;
+            font-weight: 600;
+            color: #475569;
+        }
+
+        tr:hover {
+            background: #f8fafc;
+        }
+
+        /* 操作ボタンのセル */
+        .actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        /*
+        ====================
+        モーダル（ポップアップ）
+        ====================
+        */
+        .modal {
+            display: none;                      /* デフォルトは非表示 */
+            position: fixed;                    /* 画面に固定 */
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);     /* 半透明の黒背景 */
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;                      /* 最前面に表示 */
+        }
+
+        .modal.show {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 16px;
+            padding: 30px;
+            width: 90%;
+            max-width: 500px;
+            max-height: 90vh;                   /* 画面高さの90%まで */
+            overflow-y: auto;                   /* 縦スクロール可能 */
+            animation: modalSlideIn 0.3s ease; /* アニメーション */
+        }
+
+        /* モーダルが現れるアニメーション */
+        @keyframes modalSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .modal-title {
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        /* 閉じるボタン */
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #94a3b8;
+        }
+
+        .close-btn:hover {
+            color: #475569;
+        }
+
+        /*
+        ====================
+        フォーム
+        ====================
+        */
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #374151;
+        }
+
+        .form-input, .form-select, .form-textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 15px;
+            transition: border-color 0.2s;
+        }
+
+        .form-input:focus, .form-select:focus, .form-textarea:focus {
+            outline: none;                      /* デフォルトの枠線を消す */
+            border-color: #667eea;              /* フォーカス時の色 */
+        }
+
+        .form-textarea {
+            resize: vertical;                   /* 縦方向にリサイズ可能 */
+            min-height: 100px;
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        /*
+        ====================
+        通知メッセージ
+        ====================
+        */
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 16px 24px;
+            border-radius: 8px;
+            color: white;
+            font-weight: 500;
+            animation: toastSlideIn 0.3s ease;
+            z-index: 2000;
+        }
+
+        .toast-success {
+            background: #22c55e;
+        }
+
+        .toast-error {
+            background: #ef4444;
+        }
+
+        @keyframes toastSlideIn {
+            from {
+                opacity: 0;
+                transform: translateX(100px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        /*
+        ====================
+        空の状態表示
+        ====================
+        */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #94a3b8;
+        }
+
+        .empty-state-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+
+        /*
+        ====================
+        カテゴリバッジ
+        ====================
+        */
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .badge-personal { background: #dbeafe; color: #1d4ed8; }
+        .badge-preference { background: #fef3c7; color: #b45309; }
+        .badge-skill { background: #d1fae5; color: #047857; }
+        .badge-default { background: #f1f5f9; color: #475569; }
+
+        /* ステータスバッジ */
+        .badge-active { background: #d1fae5; color: #047857; }
+        .badge-completed { background: #dbeafe; color: #1d4ed8; }
+        .badge-archived { background: #f1f5f9; color: #475569; }
+
+        /* 優先度バッジ */
+        .badge-high { background: #fee2e2; color: #dc2626; }
+        .badge-medium { background: #fef3c7; color: #b45309; }
+        .badge-low { background: #e0e7ff; color: #4338ca; }
+
+        /*
+        ====================
+        プログレスバー
+        ====================
+        */
+        .progress-bar {
+            height: 8px;
+            background: #e2e8f0;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
+
+        /*
+        ====================
+        会話表示
+        ====================
+        */
+        .conversation-item {
+            background: #f8fafc;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+        }
+
+        .conversation-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .conversation-time {
+            color: #94a3b8;
+            font-size: 12px;
+        }
+
+        .conversation-message {
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+        }
+
+        .user-message {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .assistant-message {
+            background: white;
+            border: 1px solid #e2e8f0;
+        }
+
+        .message-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+            opacity: 0.7;
+        }
+    </style>
+</head>
+
+<body>
+    <!--
+    ========================================
+    HTMLコンテンツ
+    ========================================
+
+    【HTMLの構造について】
+    - <div>: 汎用的なコンテナ要素
+    - class属性: CSSでスタイルを適用するための名前
+    - id属性: JavaScriptで要素を特定するための一意の名前
+    -->
+
+    <div class="container">
+        <!-- ヘッダー -->
+        <div class="header">
+            <h1>Memory Management</h1>
+            <a href="/" class="nav-link">チャットに戻る</a>
+        </div>
+
+        <!-- 統計カード（id属性でJavaScriptから値を更新） -->
+        <div class="stats-container">
+            <div class="stat-card">
+                <div class="stat-value" id="profileCount">0</div>
+                <div class="stat-label">プロフィール</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="goalCount">0</div>
+                <div class="stat-label">目標</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="activeGoals">0</div>
+                <div class="stat-label">アクティブな目標</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="conversationCount">0</div>
+                <div class="stat-label">会話履歴</div>
+            </div>
+        </div>
+
+        <!-- タブ切り替え -->
+        <div class="tabs">
+            <button class="tab active" data-tab="profiles">プロフィール</button>
+            <button class="tab" data-tab="goals">目標</button>
+            <button class="tab" data-tab="conversations">会話履歴</button>
+        </div>
+
+        <!-- コンテンツエリア -->
+        <div class="content">
+            <!-- プロフィールパネル -->
+            <div id="profiles-panel" class="tab-panel active">
+                <div class="section-header">
+                    <h2 class="section-title">ユーザープロフィール</h2>
+                    <button class="btn btn-primary" onclick="openProfileModal()">
+                        + 新規追加
+                    </button>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>キー</th>
+                                <th>値</th>
+                                <th>カテゴリ</th>
+                                <th>更新日時</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="profilesTable">
+                            <!-- JavaScriptで動的に追加 -->
+                        </tbody>
+                    </table>
+                </div>
+                <div id="profilesEmpty" class="empty-state" style="display: none;">
+                    <div class="empty-state-icon">📝</div>
+                    <p>プロフィールがまだありません</p>
+                </div>
+            </div>
+
+            <!-- 目標パネル -->
+            <div id="goals-panel" class="tab-panel">
+                <div class="section-header">
+                    <h2 class="section-title">目標一覧</h2>
+                    <button class="btn btn-primary" onclick="openGoalModal()">
+                        + 新規追加
+                    </button>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>タイトル</th>
+                                <th>説明</th>
+                                <th>優先度</th>
+                                <th>ステータス</th>
+                                <th>進捗</th>
+                                <th>締め切り</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="goalsTable">
+                            <!-- JavaScriptで動的に追加 -->
+                        </tbody>
+                    </table>
+                </div>
+                <div id="goalsEmpty" class="empty-state" style="display: none;">
+                    <div class="empty-state-icon">🎯</div>
+                    <p>目標がまだありません</p>
+                </div>
+            </div>
+
+            <!-- 会話履歴パネル -->
+            <div id="conversations-panel" class="tab-panel">
+                <div class="section-header">
+                    <h2 class="section-title">会話履歴</h2>
+                </div>
+                <div id="conversationsList">
+                    <!-- JavaScriptで動的に追加 -->
+                </div>
+                <div id="conversationsEmpty" class="empty-state" style="display: none;">
+                    <div class="empty-state-icon">💬</div>
+                    <p>会話履歴がまだありません</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- プロフィール追加/編集モーダル -->
+    <div id="profileModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title" id="profileModalTitle">プロフィールを追加</h3>
+                <button class="close-btn" onclick="closeProfileModal()">&times;</button>
+            </div>
+            <form id="profileForm" onsubmit="submitProfile(event)">
+                <div class="form-group">
+                    <label class="form-label">キー（項目名）</label>
+                    <input type="text" id="profileKey" class="form-input"
+                           placeholder="例: name, hobby, skill" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">値</label>
+                    <input type="text" id="profileValue" class="form-input"
+                           placeholder="例: 田中太郎, プログラミング" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">カテゴリ</label>
+                    <select id="profileCategory" class="form-select">
+                        <option value="">未分類</option>
+                        <option value="personal">個人情報</option>
+                        <option value="preference">好み・趣味</option>
+                        <option value="skill">スキル</option>
+                    </select>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeProfileModal()">
+                        キャンセル
+                    </button>
+                    <button type="submit" class="btn btn-primary">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 目標追加/編集モーダル -->
+    <div id="goalModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title" id="goalModalTitle">目標を追加</h3>
+                <button class="close-btn" onclick="closeGoalModal()">&times;</button>
+            </div>
+            <form id="goalForm" onsubmit="submitGoal(event)">
+                <input type="hidden" id="goalId">
+                <div class="form-group">
+                    <label class="form-label">タイトル</label>
+                    <input type="text" id="goalTitle" class="form-input"
+                           placeholder="例: Pythonをマスターする" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">説明</label>
+                    <textarea id="goalDescription" class="form-textarea"
+                              placeholder="目標の詳細を入力..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">優先度</label>
+                    <select id="goalPriority" class="form-select">
+                        <option value="">未設定</option>
+                        <option value="low">低</option>
+                        <option value="medium">中</option>
+                        <option value="high">高</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">ステータス</label>
+                    <select id="goalStatus" class="form-select">
+                        <option value="active">アクティブ</option>
+                        <option value="completed">完了</option>
+                        <option value="archived">アーカイブ</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">進捗率 (0-100)</label>
+                    <input type="number" id="goalProgress" class="form-input"
+                           min="0" max="100" value="0">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">締め切り</label>
+                    <input type="date" id="goalDeadline" class="form-input">
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeGoalModal()">
+                        キャンセル
+                    </button>
+                    <button type="submit" class="btn btn-primary">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!--
+    ========================================
+    JavaScript コード
+    ========================================
+
+    【JavaScriptの基本】
+    - 変数宣言: let（再代入可）, const（再代入不可）
+    - 関数定義: function 名前() {} または () => {}（アロー関数）
+    - 非同期処理: async/await（サーバー通信などで使用）
+    - DOM操作: document.getElementById() など
+    -->
+    <script>
+        // ============================================
+        // グローバル変数
+        // ============================================
+
+        // 編集中のプロフィールキー（新規追加時はnull）
+        let editingProfileKey = null;
+
+        // 編集中の目標ID（新規追加時はnull）
+        let editingGoalId = null;
+
+        // ============================================
+        // 初期化処理
+        // ============================================
+
+        /**
+         * ページ読み込み完了時に実行される処理
+         *
+         * 【DOMContentLoadedイベント】
+         * HTMLの解析が完了したタイミングで発火するイベント。
+         * 画像などのリソース読み込みは待たない。
+         */
+        document.addEventListener('DOMContentLoaded', () => {
+            // データを読み込む
+            loadStats();
+            loadProfiles();
+            loadGoals();
+            loadConversations();
+
+            // タブ切り替えのイベントを設定
+            setupTabs();
+        });
+
+        /**
+         * タブ切り替え機能のセットアップ
+         *
+         * 【querySelectorAll】
+         * CSSセレクタに一致するすべての要素を取得。
+         *
+         * 【forEach】
+         * 配列の各要素に対して関数を実行。
+         *
+         * 【data-属性】
+         * HTML要素にカスタムデータを持たせる方法。
+         * data-tab="profiles" → element.dataset.tab で "profiles" を取得
+         */
+        function setupTabs() {
+            // すべてのタブボタンを取得
+            const tabs = document.querySelectorAll('.tab');
+
+            // 各タブにクリックイベントを追加
+            tabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    // すべてのタブから active クラスを削除
+                    tabs.forEach(t => t.classList.remove('active'));
+                    // クリックされたタブに active クラスを追加
+                    tab.classList.add('active');
+
+                    // すべてのパネルを非表示
+                    document.querySelectorAll('.tab-panel').forEach(panel => {
+                        panel.classList.remove('active');
+                    });
+
+                    // 対応するパネルを表示
+                    const panelId = `${tab.dataset.tab}-panel`;
+                    document.getElementById(panelId).classList.add('active');
+                });
+            });
+        }
+
+        // ============================================
+        // 通知表示
+        // ============================================
+
+        /**
+         * トースト通知を表示する
+         *
+         * @param {string} message - 表示するメッセージ
+         * @param {string} type - 通知の種類 ('success' または 'error')
+         *
+         * 【createElement】
+         * 新しいHTML要素を作成する。
+         *
+         * 【appendChild】
+         * 要素を親要素の子として追加する。
+         *
+         * 【setTimeout】
+         * 指定ミリ秒後に関数を実行する。
+         */
+        function showToast(message, type = 'success') {
+            // トースト要素を作成
+            const toast = document.createElement('div');
+            toast.className = `toast toast-${type}`;
+            toast.textContent = message;
+
+            // bodyに追加（画面右下に表示される）
+            document.body.appendChild(toast);
+
+            // 3秒後に自動で削除
+            setTimeout(() => {
+                toast.remove();
+            }, 3000);
+        }
+
+        // ============================================
+        // 統計情報
+        // ============================================
+
+        /**
+         * 統計情報をAPIから取得して表示する
+         *
+         * 【async/await】
+         * 非同期処理を同期的に書けるようにする仕組み。
+         * await は Promise が解決されるまで待機する。
+         *
+         * 【fetch】
+         * サーバーにHTTPリクエストを送る関数。
+         * Promiseを返すので、awaitと組み合わせて使う。
+         *
+         * 【response.json()】
+         * レスポンスボディをJSONとしてパースする。
+         * これもPromiseを返す。
+         */
+        async function loadStats() {
+            try {
+                // APIにGETリクエストを送信
+                const response = await fetch('/api/memory/stats');
+
+                // レスポンスをJSONとしてパース
+                const stats = await response.json();
+
+                // 各要素に値を設定
+                // textContentは要素内のテキストを設定/取得する
+                document.getElementById('profileCount').textContent = stats.profile_count;
+                document.getElementById('goalCount').textContent = stats.goal_count;
+                document.getElementById('activeGoals').textContent = stats.active_goals;
+                document.getElementById('conversationCount').textContent = stats.conversation_count;
+            } catch (error) {
+                // エラーが発生した場合はコンソールに出力
+                console.error('Failed to load stats:', error);
+            }
+        }
+
+        // ============================================
+        // プロフィール関連
+        // ============================================
+
+        /**
+         * プロフィール一覧をAPIから取得して表示する
+         */
+        async function loadProfiles() {
+            try {
+                const response = await fetch('/api/profiles');
+                const profiles = await response.json();
+
+                // テーブルのtbody要素を取得
+                const tbody = document.getElementById('profilesTable');
+                const emptyState = document.getElementById('profilesEmpty');
+
+                // プロフィールがない場合は空の状態を表示
+                if (profiles.length === 0) {
+                    tbody.innerHTML = '';  // テーブルを空にする
+                    emptyState.style.display = 'block';
+                    return;
+                }
+
+                // 空の状態を非表示
+                emptyState.style.display = 'none';
+
+                // テーブルの内容を生成
+                // map: 配列の各要素を変換した新しい配列を作成
+                // join: 配列を文字列に結合
+                tbody.innerHTML = profiles.map(p => `
+                    <tr>
+                        <td><strong>${escapeHtml(p.key)}</strong></td>
+                        <td>${escapeHtml(p.value)}</td>
+                        <td>${getCategoryBadge(p.category)}</td>
+                        <td>${formatDate(p.updated_at)}</td>
+                        <td class="actions">
+                            <button class="btn btn-secondary btn-small"
+                                    onclick="editProfile('${escapeHtml(p.key)}')">
+                                編集
+                            </button>
+                            <button class="btn btn-danger btn-small"
+                                    onclick="deleteProfile('${escapeHtml(p.key)}')">
+                                削除
+                            </button>
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (error) {
+                console.error('Failed to load profiles:', error);
+                showToast('プロフィールの読み込みに失敗しました', 'error');
+            }
+        }
+
+        /**
+         * プロフィール追加モーダルを開く
+         */
+        function openProfileModal() {
+            editingProfileKey = null;  // 新規追加モード
+            document.getElementById('profileModalTitle').textContent = 'プロフィールを追加';
+            document.getElementById('profileForm').reset();  // フォームをリセット
+            document.getElementById('profileKey').disabled = false;  // キー入力を有効化
+            document.getElementById('profileModal').classList.add('show');
+        }
+
+        /**
+         * プロフィール編集モーダルを開く
+         *
+         * @param {string} key - 編集するプロフィールのキー
+         */
+        async function editProfile(key) {
+            try {
+                // 現在のプロフィール一覧を取得して該当するものを探す
+                const response = await fetch('/api/profiles');
+                const profiles = await response.json();
+
+                // find: 条件に一致する最初の要素を返す
+                const profile = profiles.find(p => p.key === key);
+
+                if (!profile) {
+                    showToast('プロフィールが見つかりません', 'error');
+                    return;
+                }
+
+                // 編集モードに設定
+                editingProfileKey = key;
+                document.getElementById('profileModalTitle').textContent = 'プロフィールを編集';
+
+                // フォームに現在の値を設定
+                document.getElementById('profileKey').value = profile.key;
+                document.getElementById('profileKey').disabled = true;  // キーは変更不可
+                document.getElementById('profileValue').value = profile.value;
+                document.getElementById('profileCategory').value = profile.category || '';
+
+                // モーダルを表示
+                document.getElementById('profileModal').classList.add('show');
+            } catch (error) {
+                console.error('Failed to load profile:', error);
+                showToast('プロフィールの読み込みに失敗しました', 'error');
+            }
+        }
+
+        /**
+         * プロフィールモーダルを閉じる
+         */
+        function closeProfileModal() {
+            document.getElementById('profileModal').classList.remove('show');
+        }
+
+        /**
+         * プロフィールフォームを送信する
+         *
+         * @param {Event} event - フォーム送信イベント
+         *
+         * 【event.preventDefault()】
+         * デフォルトの動作（ページリロード）を防ぐ。
+         *
+         * 【fetch の POST リクエスト】
+         * method: HTTPメソッド
+         * headers: リクエストヘッダー（Content-Typeでデータ形式を指定）
+         * body: リクエストボディ（JSON.stringifyでオブジェクトを文字列化）
+         */
+        async function submitProfile(event) {
+            event.preventDefault();  // フォームのデフォルト送信を防ぐ
+
+            // フォームの値を取得
+            const key = document.getElementById('profileKey').value;
+            const value = document.getElementById('profileValue').value;
+            const category = document.getElementById('profileCategory').value || null;
+
+            try {
+                let response;
+
+                if (editingProfileKey) {
+                    // 更新（PUT）
+                    response = await fetch(`/api/profiles/${encodeURIComponent(editingProfileKey)}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ value, category })
+                    });
+                } else {
+                    // 新規作成（POST）
+                    response = await fetch('/api/profiles', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ key, value, category })
+                    });
+                }
+
+                if (!response.ok) {
+                    throw new Error('API request failed');
+                }
+
+                // 成功したらモーダルを閉じてデータを再読み込み
+                closeProfileModal();
+                loadProfiles();
+                loadStats();
+                showToast('プロフィールを保存しました');
+            } catch (error) {
+                console.error('Failed to save profile:', error);
+                showToast('プロフィールの保存に失敗しました', 'error');
+            }
+        }
+
+        /**
+         * プロフィールを削除する
+         *
+         * @param {string} key - 削除するプロフィールのキー
+         *
+         * 【confirm】
+         * 確認ダイアログを表示。OKならtrue、キャンセルならfalseを返す。
+         */
+        async function deleteProfile(key) {
+            if (!confirm(`プロフィール「${key}」を削除しますか？`)) {
+                return;  // キャンセルされた場合は何もしない
+            }
+
+            try {
+                const response = await fetch(`/api/profiles/${encodeURIComponent(key)}`, {
+                    method: 'DELETE'
+                });
+
+                if (!response.ok) {
+                    throw new Error('Delete failed');
+                }
+
+                loadProfiles();
+                loadStats();
+                showToast('プロフィールを削除しました');
+            } catch (error) {
+                console.error('Failed to delete profile:', error);
+                showToast('プロフィールの削除に失敗しました', 'error');
+            }
+        }
+
+        // ============================================
+        // 目標関連
+        // ============================================
+
+        /**
+         * 目標一覧をAPIから取得して表示する
+         */
+        async function loadGoals() {
+            try {
+                const response = await fetch('/api/goals');
+                const goals = await response.json();
+
+                const tbody = document.getElementById('goalsTable');
+                const emptyState = document.getElementById('goalsEmpty');
+
+                if (goals.length === 0) {
+                    tbody.innerHTML = '';
+                    emptyState.style.display = 'block';
+                    return;
+                }
+
+                emptyState.style.display = 'none';
+
+                tbody.innerHTML = goals.map(g => `
+                    <tr>
+                        <td><strong>${escapeHtml(g.title)}</strong></td>
+                        <td>${escapeHtml(g.description || '-')}</td>
+                        <td>${getPriorityBadge(g.priority)}</td>
+                        <td>${getStatusBadge(g.status)}</td>
+                        <td>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <div class="progress-bar" style="width: 60px;">
+                                    <div class="progress-fill" style="width: ${g.progress}%;"></div>
+                                </div>
+                                <span style="font-size: 12px;">${g.progress}%</span>
+                            </div>
+                        </td>
+                        <td>${g.deadline ? formatDate(g.deadline) : '-'}</td>
+                        <td class="actions">
+                            <button class="btn btn-secondary btn-small"
+                                    onclick="editGoal(${g.id})">
+                                編集
+                            </button>
+                            <button class="btn btn-danger btn-small"
+                                    onclick="deleteGoal(${g.id})">
+                                削除
+                            </button>
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (error) {
+                console.error('Failed to load goals:', error);
+                showToast('目標の読み込みに失敗しました', 'error');
+            }
+        }
+
+        /**
+         * 目標追加モーダルを開く
+         */
+        function openGoalModal() {
+            editingGoalId = null;
+            document.getElementById('goalModalTitle').textContent = '目標を追加';
+            document.getElementById('goalForm').reset();
+            document.getElementById('goalProgress').value = 0;
+            document.getElementById('goalStatus').value = 'active';
+            document.getElementById('goalModal').classList.add('show');
+        }
+
+        /**
+         * 目標編集モーダルを開く
+         *
+         * @param {number} id - 編集する目標のID
+         */
+        async function editGoal(id) {
+            try {
+                const response = await fetch(`/api/goals/${id}`);
+                const goal = await response.json();
+
+                editingGoalId = id;
+                document.getElementById('goalModalTitle').textContent = '目標を編集';
+
+                // フォームに値を設定
+                document.getElementById('goalId').value = goal.id;
+                document.getElementById('goalTitle').value = goal.title;
+                document.getElementById('goalDescription').value = goal.description || '';
+                document.getElementById('goalPriority').value = goal.priority || '';
+                document.getElementById('goalStatus').value = goal.status;
+                document.getElementById('goalProgress').value = goal.progress;
+
+                // 日付の処理（APIからの日付形式を入力欄用に変換）
+                if (goal.deadline) {
+                    // ISO形式の日付からYYYY-MM-DD部分を抽出
+                    const dateStr = goal.deadline.split('T')[0];
+                    document.getElementById('goalDeadline').value = dateStr;
+                } else {
+                    document.getElementById('goalDeadline').value = '';
+                }
+
+                document.getElementById('goalModal').classList.add('show');
+            } catch (error) {
+                console.error('Failed to load goal:', error);
+                showToast('目標の読み込みに失敗しました', 'error');
+            }
+        }
+
+        /**
+         * 目標モーダルを閉じる
+         */
+        function closeGoalModal() {
+            document.getElementById('goalModal').classList.remove('show');
+        }
+
+        /**
+         * 目標フォームを送信する
+         *
+         * @param {Event} event - フォーム送信イベント
+         */
+        async function submitGoal(event) {
+            event.preventDefault();
+
+            // フォームの値を取得
+            const title = document.getElementById('goalTitle').value;
+            const description = document.getElementById('goalDescription').value || null;
+            const priority = document.getElementById('goalPriority').value || null;
+            const status = document.getElementById('goalStatus').value;
+            const progress = parseInt(document.getElementById('goalProgress').value) || 0;
+            const deadlineInput = document.getElementById('goalDeadline').value;
+
+            // 日付をISO形式に変換（入力がある場合のみ）
+            const deadline = deadlineInput ? `${deadlineInput}T00:00:00` : null;
+
+            // リクエストボディを作成
+            const body = { title, description, priority, status, progress, deadline };
+
+            try {
+                let response;
+
+                if (editingGoalId) {
+                    // 更新（PUT）
+                    response = await fetch(`/api/goals/${editingGoalId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(body)
+                    });
+                } else {
+                    // 新規作成（POST）
+                    response = await fetch('/api/goals', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(body)
+                    });
+                }
+
+                if (!response.ok) {
+                    throw new Error('API request failed');
+                }
+
+                closeGoalModal();
+                loadGoals();
+                loadStats();
+                showToast('目標を保存しました');
+            } catch (error) {
+                console.error('Failed to save goal:', error);
+                showToast('目標の保存に失敗しました', 'error');
+            }
+        }
+
+        /**
+         * 目標を削除する
+         *
+         * @param {number} id - 削除する目標のID
+         */
+        async function deleteGoal(id) {
+            if (!confirm('この目標を削除しますか？')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/goals/${id}`, {
+                    method: 'DELETE'
+                });
+
+                if (!response.ok) {
+                    throw new Error('Delete failed');
+                }
+
+                loadGoals();
+                loadStats();
+                showToast('目標を削除しました');
+            } catch (error) {
+                console.error('Failed to delete goal:', error);
+                showToast('目標の削除に失敗しました', 'error');
+            }
+        }
+
+        // ============================================
+        // 会話履歴関連
+        // ============================================
+
+        /**
+         * 会話履歴をAPIから取得して表示する
+         */
+        async function loadConversations() {
+            try {
+                const response = await fetch('/api/conversations');
+                const conversations = await response.json();
+
+                const container = document.getElementById('conversationsList');
+                const emptyState = document.getElementById('conversationsEmpty');
+
+                if (conversations.length === 0) {
+                    container.innerHTML = '';
+                    emptyState.style.display = 'block';
+                    return;
+                }
+
+                emptyState.style.display = 'none';
+
+                container.innerHTML = conversations.map(c => `
+                    <div class="conversation-item">
+                        <div class="conversation-header">
+                            <span class="conversation-time">${formatDate(c.timestamp)}</span>
+                            <button class="btn btn-danger btn-small"
+                                    onclick="deleteConversation(${c.id})">
+                                削除
+                            </button>
+                        </div>
+                        <div class="conversation-message user-message">
+                            <div class="message-label">あなた</div>
+                            ${escapeHtml(c.user_message)}
+                        </div>
+                        <div class="conversation-message assistant-message">
+                            <div class="message-label">アシスタント</div>
+                            ${escapeHtml(c.assistant_message)}
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Failed to load conversations:', error);
+                showToast('会話履歴の読み込みに失敗しました', 'error');
+            }
+        }
+
+        /**
+         * 会話を削除する
+         *
+         * @param {number} id - 削除する会話のID
+         */
+        async function deleteConversation(id) {
+            if (!confirm('この会話を削除しますか？')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/conversations/${id}`, {
+                    method: 'DELETE'
+                });
+
+                if (!response.ok) {
+                    throw new Error('Delete failed');
+                }
+
+                loadConversations();
+                loadStats();
+                showToast('会話を削除しました');
+            } catch (error) {
+                console.error('Failed to delete conversation:', error);
+                showToast('会話の削除に失敗しました', 'error');
+            }
+        }
+
+        // ============================================
+        // ユーティリティ関数
+        // ============================================
+
+        /**
+         * HTMLをエスケープしてXSS攻撃を防ぐ
+         *
+         * @param {string} text - エスケープするテキスト
+         * @returns {string} エスケープされたテキスト
+         *
+         * 【XSS攻撃とは？】
+         * ユーザー入力をそのまま表示すると、悪意のあるスクリプトが
+         * 実行される可能性がある。例:
+         * 入力: <script>alert('攻撃')</script>
+         * これを防ぐため、< > などを &lt; &gt; に変換する。
+         */
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;  // textContentは自動的にエスケープする
+            return div.innerHTML;
+        }
+
+        /**
+         * 日付を読みやすい形式にフォーマットする
+         *
+         * @param {string} dateStr - ISO形式の日付文字列
+         * @returns {string} フォーマットされた日付
+         *
+         * 【toLocaleString】
+         * 日付を地域に合わせた形式で文字列化する。
+         * 'ja-JP' で日本の形式になる。
+         */
+        function formatDate(dateStr) {
+            if (!dateStr) return '-';
+            const date = new Date(dateStr);
+            return date.toLocaleString('ja-JP', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        /**
+         * カテゴリに対応するバッジHTMLを返す
+         *
+         * @param {string} category - カテゴリ名
+         * @returns {string} バッジのHTML
+         *
+         * 【テンプレートリテラル】
+         * バッククォート（`）で囲むと、${変数}で変数を埋め込める。
+         * 複数行の文字列も書ける。
+         */
+        function getCategoryBadge(category) {
+            const labels = {
+                personal: '個人情報',
+                preference: '好み',
+                skill: 'スキル'
+            };
+            const className = category ? `badge-${category}` : 'badge-default';
+            const label = labels[category] || category || '未分類';
+            return `<span class="badge ${className}">${label}</span>`;
+        }
+
+        /**
+         * ステータスに対応するバッジHTMLを返す
+         *
+         * @param {string} status - ステータス名
+         * @returns {string} バッジのHTML
+         */
+        function getStatusBadge(status) {
+            const labels = {
+                active: 'アクティブ',
+                completed: '完了',
+                archived: 'アーカイブ'
+            };
+            return `<span class="badge badge-${status}">${labels[status] || status}</span>`;
+        }
+
+        /**
+         * 優先度に対応するバッジHTMLを返す
+         *
+         * @param {string} priority - 優先度
+         * @returns {string} バッジのHTML
+         */
+        function getPriorityBadge(priority) {
+            if (!priority) return '-';
+            const labels = {
+                low: '低',
+                medium: '中',
+                high: '高'
+            };
+            return `<span class="badge badge-${priority}">${labels[priority] || priority}</span>`;
+        }
+    </script>
+</body>
+</html>
